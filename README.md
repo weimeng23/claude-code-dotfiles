@@ -42,6 +42,10 @@ CLAUDE_CONFIG_DIR=~/.claude-work scripts/install.sh
 
 The hook commands in `settings.json` use `CLAUDE_CONFIG_DIR` when it is set and fall back to `~/.claude`.
 
+Included personal skills:
+
+- `karpathy-guidelines`: concise coding discipline for simple, surgical, verified changes.
+
 ## Validate
 
 ```sh
