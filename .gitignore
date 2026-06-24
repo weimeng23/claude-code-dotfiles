@@ -1,0 +1,47 @@
+.DS_Store
+*.log
+tmp/
+temp/
+.tmp/
+*.tmp
+
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+id_rsa*
+id_ed25519*
+secrets/
+private/
+*.token
+*.secret
+
+CLAUDE.local.md
+.claude/settings.local.json
+.claude.json
+claude.json
+settings.local.json
+*.local.json
+backups/
+
+# Real MCP config; commit examples as .mcp.example.json
+.mcp.json
+
+# Claude Code runtime state and install-test output
+.claude-internal/
+.claude-work/
+.claude-personal/
+claude-code-dotfiles-*-test/
+
+# Editor and tool caches
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python caches used by hook validation helpers
+__pycache__/
+*.py[cod]
