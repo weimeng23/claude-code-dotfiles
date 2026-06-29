@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source_dir="$repo_root/claude-user"
-target_dir="${CLAUDE_CONFIG_DIR:-${CLAUDE_HOME:-$HOME/.claude}}"
+target_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 timestamp="$(date +%Y%m%d-%H%M%S)"
 backup_dir="$target_dir/backups/dotfiles-$timestamp"
 
