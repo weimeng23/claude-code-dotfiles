@@ -40,4 +40,8 @@ After editing JSON, validate that it parses.
 
 After editing shell scripts, run `bash -n`.
 
-After changing install behavior, run `scripts/validate.sh` and inspect the script flow before using it against the resolved target directory.
+After changing settings, hooks, or install behavior, run `scripts/validate.sh`.
+
+Test hook behavior with representative JSON input.
+
+Test installer changes with a temporary `CLAUDE_CONFIG_DIR`. Do not run an unverified installer against the real user config directory.
