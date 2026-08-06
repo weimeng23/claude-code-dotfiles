@@ -8,19 +8,19 @@
       "Bash(rg *)"
     ],
     "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)",
-      "Read(./**/.env)",
-      "Read(./**/.env.*)",
-      "Read(./secrets/**)",
-      "Read(./**/secrets/**)",
-      "Read(./id_rsa)",
-      "Read(./id_ed25519)",
-      "Read(./*.pem)",
-      "Read(./*.key)",
-      "Read(./*.crt)",
-      "Read(./*.token)",
-      "Read(./*.secret)"
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/secrets/**)",
+      "Read(**/secret/**)",
+      "Read(**/credentials/**)",
+      "Read(**/private/**)",
+      "Read(id_rsa*)",
+      "Read(id_ed25519*)",
+      "Read(*.pem)",
+      "Read(*.key)",
+      "Read(*.crt)",
+      "Read(*.token)",
+      "Read(*.secret)"
     ]
   },
   "hooks": {

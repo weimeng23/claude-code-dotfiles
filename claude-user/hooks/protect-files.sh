@@ -5,7 +5,10 @@ input="$(cat)"
 
 json_file_path() {
   if command -v jq >/dev/null 2>&1; then
-    printf '%s' "$input" | jq -r '.tool_input.file_path // ""'
+    printf '%s' "$input" | jq -r '
+      (.tool_input.file_path // "") as $file
+      | if $file != "" then $file else (.tool_input.notebook_path // "") end
+    '
   elif command -v python3 >/dev/null 2>&1; then
     JSON_INPUT="$input" python3 - <<'PY'
 import json
@@ -16,7 +19,8 @@ try:
 except json.JSONDecodeError:
     data = {}
 
-print(data.get("tool_input", {}).get("file_path", ""))
+tool_input = data.get("tool_input", {})
+print(tool_input.get("file_path") or tool_input.get("notebook_path", ""))
 PY
   fi
 }
@@ -32,15 +36,15 @@ case "$file" in
     echo "Blocked edit/write to env file: $file" >&2
     exit 2
     ;;
-  *id_rsa*|*id_ed25519*|*.pem|*.key|*.crt)
-    echo "Blocked edit/write to key or certificate file: $file" >&2
+  *id_rsa*|*id_ed25519*|*.pem|*.key|*.crt|*.token|*.secret)
+    echo "Blocked edit/write to sensitive file: $file" >&2
     exit 2
     ;;
   */.git/*)
     echo "Blocked edit/write inside .git directory: $file" >&2
     exit 2
     ;;
-  */secrets/*|*/secret/*|*/credentials/*)
+  */secrets/*|*/secret/*|*/credentials/*|*/private/*)
     echo "Blocked edit/write to secrets/credentials path: $file" >&2
     exit 2
     ;;

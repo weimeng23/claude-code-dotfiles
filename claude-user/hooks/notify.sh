@@ -1,7 +1,31 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-message="${1:-Claude Code needs your attention}"
+input=""
+if [[ ! -t 0 ]]; then
+  input="$(cat)"
+fi
+
+json_message() {
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$input" | jq -r '.message // ""' 2>/dev/null
+  elif command -v python3 >/dev/null 2>&1; then
+    JSON_INPUT="$input" python3 - <<'PY'
+import json
+import os
+
+try:
+    data = json.loads(os.environ.get("JSON_INPUT", "{}"))
+except json.JSONDecodeError:
+    data = {}
+
+print(data.get("message", ""))
+PY
+  fi
+}
+
+message="${1:-$(json_message)}"
+message="${message:-Claude Code needs your attention}"
 title="${2:-Claude Code}"
 
 case "$(uname -s)" in

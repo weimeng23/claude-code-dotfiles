@@ -34,6 +34,9 @@ CLAUDE_CONFIG_DIR=~/.claude-work scripts/install.sh
 
 Existing files are backed up under `$CLAUDE_CONFIG_DIR/backups/dotfiles-<timestamp>/` before being overwritten.
 
+The installer validates managed JSON and shell files before writing to the target directory.
+JSON validation requires either `jq` or `python3`.
+
 The hook commands in `settings.json` use `CLAUDE_CONFIG_DIR` when it is set and fall back to `~/.claude`.
 
 The installer copies managed files but does not delete stale files that already exist in the target directory.

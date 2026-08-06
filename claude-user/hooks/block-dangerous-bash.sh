@@ -27,27 +27,41 @@ if [[ -z "$cmd" ]]; then
   exit 0
 fi
 
-if echo "$cmd" | grep -Eiq '(^|[ ;|&])rm[[:space:]]+-rf[[:space:]]+(/|~|\$HOME|\*)'; then
+contains_dangerous_rm() {
+  local segment
+
+  while IFS= read -r segment; do
+    if printf '%s' "$segment" | grep -Eiq '(^|[[:space:]])(--recursive|-[[:alpha:]]*r[[:alpha:]]*)($|[[:space:]])' &&
+      printf '%s' "$segment" | grep -Eiq '(^|[[:space:]])(--force|-[[:alpha:]]*f[[:alpha:]]*)($|[[:space:]])' &&
+      printf '%s' "$segment" | grep -Eiq "(^|[[:space:]])[\"']?(/|~|\\\$HOME|\\\${HOME}|\\*)"; then
+      return 0
+    fi
+  done < <(printf '%s' "$cmd" | grep -Eio '(^|[;&|()[:space:]])rm[[:space:]][^;&|()]*')
+
+  return 1
+}
+
+if contains_dangerous_rm; then
   echo "Blocked dangerous command: rm -rf on root/home/wildcard path." >&2
   exit 2
 fi
 
-if echo "$cmd" | grep -Eiq 'git[[:space:]]+reset[[:space:]]+--hard|git[[:space:]]+clean[[:space:]]+-[a-zA-Z]*f'; then
+if printf '%s' "$cmd" | grep -Eiq 'git[[:space:]]+reset[[:space:]]+--hard|git[[:space:]]+clean[[:space:]]+-[a-zA-Z]*f'; then
   echo "Blocked dangerous git destructive command: $cmd" >&2
   exit 2
 fi
 
-if echo "$cmd" | grep -Eiq 'chmod[[:space:]]+-R[[:space:]]+777|chown[[:space:]]+-R'; then
+if printf '%s' "$cmd" | grep -Eiq 'chmod[[:space:]]+-R[[:space:]]+777|chown[[:space:]]+-R'; then
   echo "Blocked dangerous permission ownership command: $cmd" >&2
   exit 2
 fi
 
-if echo "$cmd" | grep -Eiq '(curl|wget).*\|[[:space:]]*(sh|bash|zsh)'; then
+if printf '%s' "$cmd" | grep -Eiq '(curl|wget).*\|[[:space:]]*(sh|bash|zsh)'; then
   echo "Blocked pipe-to-shell command: $cmd" >&2
   exit 2
 fi
 
-if echo "$cmd" | grep -Eiq 'sudo[[:space:]]+(rm|chmod|chown|dd|mkfs|mount|umount|reboot|shutdown)'; then
+if printf '%s' "$cmd" | grep -Eiq 'sudo[[:space:]]+(rm|chmod|chown|dd|mkfs|mount|umount|reboot|shutdown)'; then
   echo "Blocked risky sudo command: $cmd" >&2
   exit 2
 fi

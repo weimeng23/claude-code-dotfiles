@@ -12,14 +12,14 @@ backup_file() {
   local rel="${target#$target_dir/}"
   local backup="$backup_dir/$rel"
 
-  if [[ -f "$target" ]]; then
+  if [[ -e "$target" || -L "$target" ]]; then
     mkdir -p "$(dirname "$backup")"
-    cp "$target" "$backup"
+    cp -P "$target" "$backup"
     echo "backup: $target -> $backup"
   fi
 }
 
-install_file() {
+check_target() {
   local source="$1"
   local target="$2"
 
@@ -27,7 +27,24 @@ install_file() {
     return
   fi
 
+  if [[ -d "$target" ]]; then
+    echo "error: install target is a directory: $target" >&2
+    return 1
+  fi
+}
+
+install_file() {
+  local source="$1"
+  local target="$2"
+  local temp
+
+  if [[ "$(basename "$source")" == ".gitkeep" ]]; then
+    return
+  fi
+
   mkdir -p "$(dirname "$target")"
+
+  check_target "$source" "$target"
 
   if [[ -f "$target" ]] && cmp -s "$source" "$target"; then
     echo "unchanged: $target"
@@ -35,8 +52,24 @@ install_file() {
   fi
 
   backup_file "$target"
-  cp "$source" "$target"
+  temp="$(mktemp "${target}.tmp.XXXXXX")"
+  if ! cp -p "$source" "$temp" || ! mv -f "$temp" "$target"; then
+    rm -f "$temp"
+    return 1
+  fi
   echo "installed: $target"
+}
+
+check_tree_targets() {
+  local source_tree="$1"
+  local target_tree="$2"
+
+  [[ -d "$source_tree" ]] || return
+
+  while IFS= read -r -d '' source_file; do
+    local rel="${source_file#$source_tree/}"
+    check_target "$source_file" "$target_tree/$rel"
+  done < <(find "$source_tree" -type f -print0)
 }
 
 install_tree() {
@@ -50,6 +83,19 @@ install_tree() {
     install_file "$source_file" "$target_tree/$rel"
   done < <(find "$source_tree" -type f -print0)
 }
+
+"$repo_root/scripts/validate.sh"
+
+if [[ -e "$target_dir" && ! -d "$target_dir" ]]; then
+  echo "error: config target is not a directory: $target_dir" >&2
+  exit 1
+fi
+
+check_target "$source_dir/CLAUDE.md" "$target_dir/CLAUDE.md"
+check_target "$source_dir/settings.json" "$target_dir/settings.json"
+check_tree_targets "$source_dir/agents" "$target_dir/agents"
+check_tree_targets "$source_dir/skills" "$target_dir/skills"
+check_tree_targets "$source_dir/hooks" "$target_dir/hooks"
 
 mkdir -p "$target_dir"
 
