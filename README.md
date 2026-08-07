@@ -10,6 +10,7 @@ Personal Claude Code configuration managed as dotfiles.
 - `claude-user/skills/`: personal skills installed to `$CLAUDE_CONFIG_DIR/skills/`
 - `claude-user/hooks/`: personal hooks installed to `$CLAUDE_CONFIG_DIR/hooks/`
 - `scripts/install.sh`: installs the personal config with backups
+- `scripts/install-skills.sh`: installs only personal skills for Claude Code or Codex
 - `scripts/validate.sh`: validates JSON and shell scripts
 
 ## Install
@@ -32,7 +33,21 @@ Install to a different Claude Code config directory:
 CLAUDE_CONFIG_DIR=~/.claude-work scripts/install.sh
 ```
 
-Existing files are backed up under `$CLAUDE_CONFIG_DIR/backups/dotfiles-<timestamp>/` before being overwritten.
+Install only personal skills:
+
+```sh
+scripts/install-skills.sh claude
+scripts/install-skills.sh codex
+scripts/install-skills.sh all
+```
+
+Claude Code skills use `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/`. Codex skills default to `~/.agents/skills/`; set `CODEX_SKILLS_DIR` to override it:
+
+```sh
+CODEX_SKILLS_DIR=~/.codex/skills scripts/install-skills.sh codex
+```
+
+Existing files are backed up under the selected tool's config root at `backups/dotfiles-<timestamp>/` before being overwritten.
 
 The installer validates managed JSON and shell files before writing to the target directory.
 JSON validation requires either `jq` or `python3`.

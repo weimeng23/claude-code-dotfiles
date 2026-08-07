@@ -3,7 +3,36 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source_dir="$repo_root/claude-user"
-target_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+mode="${1:-full}"
+skills_target="${2:-}"
+
+usage() {
+  echo "usage: $0 [--skills-only claude|codex]" >&2
+}
+
+if [[ "$mode" == "full" && $# -eq 0 ]]; then
+  target_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  skills_dir="$target_dir/skills"
+elif [[ "$mode" == "--skills-only" && $# -eq 2 ]]; then
+  case "$skills_target" in
+    claude)
+      target_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+      skills_dir="$target_dir/skills"
+      ;;
+    codex)
+      skills_dir="${CODEX_SKILLS_DIR:-$HOME/.agents/skills}"
+      target_dir="$(dirname "$skills_dir")"
+      ;;
+    *)
+      usage
+      exit 2
+      ;;
+  esac
+else
+  usage
+  exit 2
+fi
+
 timestamp="$(date +%Y%m%d-%H%M%S)"
 backup_dir="$target_dir/backups/dotfiles-$timestamp"
 
@@ -91,10 +120,18 @@ if [[ -e "$target_dir" && ! -d "$target_dir" ]]; then
   exit 1
 fi
 
+if [[ "$mode" == "--skills-only" ]]; then
+  check_tree_targets "$source_dir/skills" "$skills_dir"
+  mkdir -p "$target_dir"
+  install_tree "$source_dir/skills" "$skills_dir"
+  echo "done: installed personal skills to $skills_dir"
+  exit 0
+fi
+
 check_target "$source_dir/CLAUDE.md" "$target_dir/CLAUDE.md"
 check_target "$source_dir/settings.json" "$target_dir/settings.json"
 check_tree_targets "$source_dir/agents" "$target_dir/agents"
-check_tree_targets "$source_dir/skills" "$target_dir/skills"
+check_tree_targets "$source_dir/skills" "$skills_dir"
 check_tree_targets "$source_dir/hooks" "$target_dir/hooks"
 
 mkdir -p "$target_dir"
@@ -102,7 +139,7 @@ mkdir -p "$target_dir"
 install_file "$source_dir/CLAUDE.md" "$target_dir/CLAUDE.md"
 install_file "$source_dir/settings.json" "$target_dir/settings.json"
 install_tree "$source_dir/agents" "$target_dir/agents"
-install_tree "$source_dir/skills" "$target_dir/skills"
+install_tree "$source_dir/skills" "$skills_dir"
 install_tree "$source_dir/hooks" "$target_dir/hooks"
 
 echo "done: installed personal Claude Code config to $target_dir"
