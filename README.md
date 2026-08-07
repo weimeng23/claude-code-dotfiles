@@ -51,6 +51,7 @@ Existing files are backed up under the selected tool's config root at `backups/d
 
 The installer validates managed JSON and shell files before writing to the target directory.
 JSON validation requires either `jq` or `python3`.
+Skill structure and names are always validated. Metadata is checked per Skill with the cached `skills` CLI in offline mode when available; a skipped metadata check warns but does not block installation.
 
 The hook commands in `settings.json` use `CLAUDE_CONFIG_DIR` when it is set and fall back to `~/.claude`.
 
