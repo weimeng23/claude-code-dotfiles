@@ -11,6 +11,7 @@ Personal Claude Code configuration managed as dotfiles.
 - `claude-user/hooks/`: personal hooks installed to `$CLAUDE_CONFIG_DIR/hooks/`
 - `scripts/install.sh`: installs the personal config with backups
 - `scripts/install-skills.sh`: installs only personal skills for Claude Code or Codex
+- `scripts/import-skill.sh`: imports one external skill into the repository for review
 - `scripts/validate.sh`: validates JSON and shell scripts
 
 ## Install
@@ -56,6 +57,16 @@ Skill structure and names are always validated. Metadata is checked per Skill wi
 The hook commands in `settings.json` use `CLAUDE_CONFIG_DIR` when it is set and fall back to `~/.claude`.
 
 The installer copies managed files but does not delete stale files that already exist in the target directory.
+
+## Import a Skill
+
+Import one external skill into `claude-user/skills/`:
+
+```sh
+scripts/import-skill.sh vercel-labs/skills find-skills
+```
+
+The importer downloads into the ignored `tmp/` directory, copies the selected skill into the repository, validates it, and removes the temporary download. It refuses to overwrite an existing skill. Review all imported instructions and scripts before installing or committing them.
 
 Included personal skills:
 
