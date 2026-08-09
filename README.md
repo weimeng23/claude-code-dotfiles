@@ -60,13 +60,14 @@ The installer copies managed files but does not delete stale files that already 
 
 ## Import a Skill
 
-Import one external skill into `claude-user/skills/`:
+Import one or more external skills into `claude-user/skills/`:
 
 ```sh
 scripts/import-skill.sh vercel-labs/skills find-skills
+scripts/import-skill.sh owner/repo skill-a skill-b skill-c
 ```
 
-The importer downloads into the ignored `tmp/` directory, copies the selected skill into the repository, validates it, and removes the temporary download. It refuses to overwrite an existing skill. Review all imported instructions and scripts before installing or committing them.
+The importer downloads the source once into the ignored `tmp/` directory, copies the selected skills into the repository, validates them, and removes the temporary download. It refuses to overwrite an existing skill and rolls back the whole batch when an import fails. Review all imported instructions and scripts before installing or committing them.
 
 Included personal skills:
 

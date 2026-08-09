@@ -129,7 +129,7 @@ validate_skills() {
     echo "skill ok: ${skill_file#$repo_root/}"
 
     if command -v npx >/dev/null 2>&1; then
-      if NO_COLOR=1 npx --yes --offline skills add "$entry" --list >/dev/null 2>&1; then
+      if NO_COLOR=1 npx --yes --offline skills add "$entry" --list </dev/null >/dev/null 2>&1; then
         echo "skill metadata ok: ${skill_file#$repo_root/}"
       else
         echo "warning: skipped Skill metadata validation for ${skill_file#$repo_root/}; cached skills CLI unavailable or Skill rejected" >&2
