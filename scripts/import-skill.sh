@@ -3,100 +3,396 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 skills_dir="$repo_root/claude-user/skills"
-package="${1:-}"
-skill_names=("${@:2}")
+manifest="$repo_root/claude-user/skills-sources.json"
 
 usage() {
-  echo "usage: $0 <owner/repo-or-url> <skill-name> [skill-name ...]" >&2
+  cat >&2 <<'EOF'
+usage:
+  import-skill.sh [--full-depth] <owner/repo-or-url> <skill-name> [skill-name ...]
+      Import new skills and record their source in skills-sources.json.
+
+  import-skill.sh --update <skill-name> [skill-name ...]
+      Re-import existing skills from their recorded source (latest upstream).
+
+  import-skill.sh --update --all
+      Re-import every skill listed in skills-sources.json.
+EOF
 }
 
-if [[ $# -lt 2 ]]; then
-  usage
-  exit 2
-fi
+# Manifest access is centralized here so the JSON schema lives in one place.
+require_python() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "error: python3 is required to read/write $manifest" >&2
+    exit 1
+  fi
+}
 
-seen_names=" "
-for skill_name in "${skill_names[@]}"; do
+# Exit 3: unreadable/invalid JSON (python already printed).
+# Exit 4: missing file or missing skill entry.
+manifest_get() {
+  local skill="$1"
+  python3 - "$manifest" "$skill" <<'PY'
+import json, os, sys
+
+path, skill = sys.argv[1], sys.argv[2]
+if not os.path.exists(path):
+    sys.exit(4)
+try:
+    with open(path) as fh:
+        data = json.load(fh)
+except (OSError, json.JSONDecodeError) as exc:
+    sys.stderr.write("error: cannot parse %s: %s\n" % (path, exc))
+    sys.exit(3)
+if not isinstance(data, dict):
+    sys.stderr.write("error: %s must be a JSON object\n" % path)
+    sys.exit(3)
+entry = data.get(skill)
+if not isinstance(entry, dict) or "package" not in entry:
+    sys.exit(4)
+print("%s\t%s" % (entry["package"], "true" if entry.get("fullDepth") else "false"))
+PY
+}
+
+manifest_names() {
+  python3 - "$manifest" <<'PY'
+import json, os, sys
+
+path = sys.argv[1]
+if not os.path.exists(path):
+    sys.exit(0)
+try:
+    with open(path) as fh:
+        data = json.load(fh)
+except (OSError, json.JSONDecodeError) as exc:
+    sys.stderr.write("error: cannot parse %s: %s\n" % (path, exc))
+    sys.exit(3)
+if not isinstance(data, dict):
+    sys.stderr.write("error: %s must be a JSON object\n" % path)
+    sys.exit(3)
+for name in sorted(data):
+    print(name)
+PY
+}
+
+manifest_upsert() {
+  local skill="$1" package="$2" full_depth="$3"
+  python3 - "$manifest" "$skill" "$package" "$full_depth" <<'PY'
+import json, os, sys, tempfile
+
+path, skill, package, full_depth = sys.argv[1:5]
+data = {}
+if os.path.exists(path):
+    try:
+        with open(path) as fh:
+            data = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        sys.stderr.write("error: cannot parse %s: %s\n" % (path, exc))
+        sys.exit(3)
+    if not isinstance(data, dict):
+        sys.stderr.write("error: %s must be a JSON object\n" % path)
+        sys.exit(3)
+
+entry = dict(data[skill]) if isinstance(data.get(skill), dict) else {}
+entry["package"] = package
+if full_depth == "true":
+    entry["fullDepth"] = True
+else:
+    entry.pop("fullDepth", None)
+data[skill] = entry
+
+directory = os.path.dirname(path) or "."
+fd, tmp = tempfile.mkstemp(prefix=".skills-sources.", suffix=".tmp", dir=directory)
+try:
+    with os.fdopen(fd, "w") as fh:
+        json.dump(data, fh, indent=2, sort_keys=True)
+        fh.write("\n")
+    os.replace(tmp, path)
+except Exception:
+    try:
+        os.unlink(tmp)
+    except OSError:
+        pass
+    raise
+PY
+}
+
+validate_name() {
+  local skill_name="$1"
   if [[ ! "$skill_name" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ || ${#skill_name} -gt 64 ]]; then
     echo "error: invalid skill name: $skill_name" >&2
     exit 2
   fi
+}
 
+require_npx() {
+  if ! command -v npx >/dev/null 2>&1; then
+    echo "error: npx is required to import skills" >&2
+    exit 1
+  fi
+}
+
+# Download one package into a fresh work subdir and copy the requested skills
+# into the repository. Registers each target before copying so a failed copy
+# is still removed by the cleanup trap.
+fetch_into_repo() {
+  local package="$1" full_depth="$2"
+  shift 2
+  local names=("$@")
+  local sub depth_flag=() name source_dir
+
+  sub="$(mktemp -d "$work_dir/fetch.XXXXXX")"
+  if [[ "$full_depth" == "true" ]]; then
+    depth_flag=(--full-depth)
+  fi
+
+  (
+    cd "$sub"
+    npx --yes skills add "$package" \
+      --skill "${names[@]}" \
+      --agent claude-code \
+      --copy \
+      ${depth_flag[@]+"${depth_flag[@]}"} \
+      -y
+  )
+
+  for name in "${names[@]}"; do
+    source_dir="$sub/.agents/skills/$name"
+    if [[ ! -d "$source_dir" ]]; then
+      source_dir="$sub/.claude/skills/$name"
+    fi
+    if [[ ! -d "$source_dir" || ! -f "$source_dir/SKILL.md" ]]; then
+      echo "error: imported skill not found: $name" >&2
+      return 1
+    fi
+    created_dirs+=("$skills_dir/$name")
+    cp -R "$source_dir" "$skills_dir/$name"
+  done
+}
+
+# --- argument parsing -------------------------------------------------------
+
+mode="import"
+full_depth="false"
+update_all="false"
+
+case "${1:-}" in
+  --update-all)
+    echo "error: use --update --all" >&2
+    exit 2
+    ;;
+  --update)
+    mode="update"
+    shift
+    ;;
+esac
+
+declare -a skill_names=()
+package=""
+
+if [[ "$mode" == "import" ]]; then
+  if [[ "${1:-}" == "--full-depth" ]]; then
+    full_depth="true"
+    shift
+  fi
+  package="${1:-}"
+  skill_names=("${@:2}")
+  if [[ -z "$package" || ${#skill_names[@]} -lt 1 ]]; then
+    usage
+    exit 2
+  fi
+elif [[ "$mode" == "update" ]]; then
+  for arg in "$@"; do
+    if [[ "$arg" == "--all" ]]; then
+      update_all="true"
+    else
+      skill_names+=("$arg")
+    fi
+  done
+
+  if [[ "$update_all" == "true" && ${#skill_names[@]} -gt 0 ]]; then
+    echo "error: --all cannot be combined with skill names" >&2
+    exit 2
+  fi
+
+  if [[ "$update_all" != "true" && ${#skill_names[@]} -lt 1 ]]; then
+    usage
+    exit 2
+  fi
+fi
+
+require_npx
+require_python
+
+if [[ "$update_all" == "true" ]]; then
+  if ! names_raw="$(manifest_names)"; then
+    exit 1
+  fi
+  while IFS= read -r name; do
+    [[ -n "$name" ]] && skill_names+=("$name")
+  done <<< "$names_raw"
+  if [[ ${#skill_names[@]} -lt 1 ]]; then
+    echo "error: no skills recorded in ${manifest#$repo_root/}" >&2
+    exit 1
+  fi
+fi
+
+# --- validation & source resolution ----------------------------------------
+
+seen_names=" "
+for skill_name in "${skill_names[@]}"; do
+  validate_name "$skill_name"
   if [[ "$seen_names" == *" $skill_name "* ]]; then
     echo "error: duplicate skill name: $skill_name" >&2
     exit 2
   fi
   seen_names+="$skill_name "
-
-  target_dir="$skills_dir/$skill_name"
-  if [[ -e "$target_dir" || -L "$target_dir" ]]; then
-    echo "error: skill already exists: ${target_dir#$repo_root/}" >&2
-    exit 1
-  fi
 done
 
-if ! command -v npx >/dev/null 2>&1; then
-  echo "error: npx is required to import skills" >&2
-  exit 1
+if [[ "$mode" == "import" ]]; then
+  for skill_name in "${skill_names[@]}"; do
+    target_dir="$skills_dir/$skill_name"
+    if [[ -e "$target_dir" || -L "$target_dir" ]]; then
+      echo "error: skill already exists: ${target_dir#$repo_root/}" >&2
+      echo "hint: use 'import-skill.sh --update $skill_name' to refresh it" >&2
+      exit 1
+    fi
+  done
 fi
+
+# --- workspace & rollback ---------------------------------------------------
 
 mkdir -p "$repo_root/tmp" "$skills_dir"
 work_dir="$(mktemp -d "$repo_root/tmp/skill-import.XXXXXX")"
-copied_dirs=()
+timestamp="$(date +%Y%m%d-%H%M%S)"
+declare -a created_dirs=()
+declare -a backup_skills=()
+declare -a backup_dirs=()
 completed=false
 
 cleanup() {
   local status=$?
+  local index keep
 
-  rm -rf "$work_dir"
   if [[ "$completed" != true ]]; then
-    for copied_dir in "${copied_dirs[@]}"; do
-      rm -rf "$copied_dir"
+    if ((${#created_dirs[@]})); then
+      for index in "${!created_dirs[@]}"; do
+        rm -rf "${created_dirs[$index]}"
+      done
+    fi
+    if ((${#backup_skills[@]})); then
+      for index in "${!backup_skills[@]}"; do
+        rm -rf "$skills_dir/${backup_skills[$index]}"
+        mv "${backup_dirs[$index]}" "$skills_dir/${backup_skills[$index]}"
+      done
+    fi
+  elif ((${#backup_skills[@]})); then
+    keep="$repo_root/backups/skill-update-$timestamp"
+    mkdir -p "$keep"
+    for index in "${!backup_skills[@]}"; do
+      mv "${backup_dirs[$index]}" "$keep/${backup_skills[$index]}"
+      echo "backup: claude-user/skills/${backup_skills[$index]} -> ${keep#$repo_root/}/${backup_skills[$index]}"
     done
   fi
 
+  rm -rf "$work_dir"
   return "$status"
 }
 
 trap cleanup EXIT
 
-(
-  cd "$work_dir"
-  npx --yes skills add "$package" \
-    --skill "${skill_names[@]}" \
-    --agent claude-code \
-    --copy \
-    -y
-)
+# --- import mode ------------------------------------------------------------
 
-source_dirs=()
-for skill_name in "${skill_names[@]}"; do
-  source_dir="$work_dir/.agents/skills/$skill_name"
-  if [[ ! -d "$source_dir" ]]; then
-    source_dir="$work_dir/.claude/skills/$skill_name"
-  fi
+if [[ "$mode" == "import" ]]; then
+  fetch_into_repo "$package" "$full_depth" "${skill_names[@]}"
 
-  if [[ ! -d "$source_dir" || ! -f "$source_dir/SKILL.md" ]]; then
-    echo "error: imported skill not found: $skill_name" >&2
+  if ! "$repo_root/scripts/validate.sh"; then
+    echo "error: imported skills failed validation and were removed" >&2
     exit 1
   fi
 
-  source_dirs+=("$source_dir")
+  for skill_name in "${skill_names[@]}"; do
+    manifest_upsert "$skill_name" "$package" "$full_depth"
+  done
+
+  completed=true
+  for skill_name in "${skill_names[@]}"; do
+    echo "imported: $package@$skill_name -> claude-user/skills/$skill_name"
+  done
+  echo "recorded source in ${manifest#$repo_root/}"
+  echo "next: review the imported files, then run scripts/install-skills.sh all"
+  exit 0
+fi
+
+# --- update mode ------------------------------------------------------------
+
+declare -a skill_packages=()
+declare -a skill_depths=()
+
+for skill_name in "${skill_names[@]}"; do
+  if source_line="$(manifest_get "$skill_name")"; then
+    skill_packages+=("${source_line%%$'\t'*}")
+    skill_depths+=("${source_line##*$'\t'}")
+  else
+    status=$?
+    if [[ "$status" -eq 4 ]]; then
+      echo "error: no recorded source for skill: $skill_name" >&2
+      echo "hint: import it first with 'import-skill.sh <owner/repo> $skill_name'" >&2
+    fi
+    exit 1
+  fi
 done
 
 for index in "${!skill_names[@]}"; do
-  target_dir="$skills_dir/${skill_names[$index]}"
-  copied_dirs+=("$target_dir")
-  cp -R "${source_dirs[$index]}" "$target_dir"
+  skill_name="${skill_names[$index]}"
+  target_dir="$skills_dir/$skill_name"
+  if [[ -d "$target_dir" ]]; then
+    backup_dir="$work_dir/backup-$skill_name"
+    mv "$target_dir" "$backup_dir"
+    backup_skills+=("$skill_name")
+    backup_dirs+=("$backup_dir")
+  fi
+done
+
+for index in "${!skill_names[@]}"; do
+  already="false"
+  if ((index > 0)); then
+    for ((prior = 0; prior < index; prior++)); do
+      if [[ "${skill_packages[$prior]}" == "${skill_packages[$index]}" && "${skill_depths[$prior]}" == "${skill_depths[$index]}" ]]; then
+        already="true"
+        break
+      fi
+    done
+  fi
+  [[ "$already" == "true" ]] && continue
+
+  group_names=()
+  for ((other = 0; other < ${#skill_names[@]}; other++)); do
+    if [[ "${skill_packages[$other]}" == "${skill_packages[$index]}" && "${skill_depths[$other]}" == "${skill_depths[$index]}" ]]; then
+      group_names+=("${skill_names[$other]}")
+    fi
+  done
+  fetch_into_repo "${skill_packages[$index]}" "${skill_depths[$index]}" "${group_names[@]}"
 done
 
 if ! "$repo_root/scripts/validate.sh"; then
-  echo "error: imported skills failed validation and were removed" >&2
+  echo "error: updated skills failed validation and were rolled back" >&2
   exit 1
 fi
 
 completed=true
-for skill_name in "${skill_names[@]}"; do
-  echo "imported: $package@$skill_name -> claude-user/skills/$skill_name"
-done
-echo "next: review the imported files, then run scripts/install-skills.sh"
+
+# Report per-skill diffs against the pre-update backups.
+if ((${#backup_skills[@]})); then
+  for index in "${!backup_skills[@]}"; do
+    skill_name="${backup_skills[$index]}"
+    echo "=== diff: $skill_name ==="
+    if diff -ru "${backup_dirs[$index]}" "$skills_dir/$skill_name" >/dev/null 2>&1; then
+      echo "unchanged: $skill_name"
+    else
+      diff -ru "${backup_dirs[$index]}" "$skills_dir/$skill_name" || true
+      echo "updated: $skill_name"
+    fi
+  done
+fi
+
+echo "next: review the changes above, then run scripts/install-skills.sh all"

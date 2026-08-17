@@ -1,0 +1,17 @@
+{
+  "find-skills": {
+    "package": "vercel-labs/skills"
+  },
+  "grill-me": {
+    "package": "mattpocock/skills"
+  },
+  "grilling": {
+    "package": "mattpocock/skills"
+  },
+  "handoff": {
+    "package": "ykdojo/claude-code-tips"
+  },
+  "karpathy-guidelines": {
+    "package": "multica-ai/andrej-karpathy-skills"
+  }
+}

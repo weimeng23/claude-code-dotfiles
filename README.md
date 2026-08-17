@@ -9,9 +9,10 @@ Personal Claude Code configuration managed as dotfiles.
 - `claude-user/agents/`: personal subagents installed to `$CLAUDE_CONFIG_DIR/agents/`
 - `claude-user/skills/`: personal skills installed to `$CLAUDE_CONFIG_DIR/skills/`
 - `claude-user/hooks/`: personal hooks installed to `$CLAUDE_CONFIG_DIR/hooks/`
+- `claude-user/skills-sources.json`: repo-local manifest mapping each imported skill to its upstream source (not installed)
 - `scripts/install.sh`: installs the personal config with backups
 - `scripts/install-skills.sh`: installs only personal skills for Claude Code or Codex
-- `scripts/import-skill.sh`: imports one external skill into the repository for review
+- `scripts/import-skill.sh`: imports external skills into the repository for review, and updates them to their latest upstream version
 - `scripts/validate.sh`: validates JSON and shell scripts
 
 ## Install
@@ -67,7 +68,30 @@ scripts/import-skill.sh vercel-labs/skills find-skills
 scripts/import-skill.sh owner/repo skill-a skill-b skill-c
 ```
 
-The importer downloads the source once into the ignored `tmp/` directory, copies the selected skills into the repository, validates them, and removes the temporary download. It refuses to overwrite an existing skill and rolls back the whole batch when an import fails. Review all imported instructions and scripts before installing or committing them.
+Add `--full-depth` only when the upstream repository has a root `SKILL.md` that would otherwise hide nested skills:
+
+```sh
+scripts/import-skill.sh --full-depth owner/repo nested-skill
+```
+
+The importer downloads each package once into the ignored `tmp/` directory, copies the selected skills into the repository, validates them, and removes the temporary download. It refuses to overwrite an existing skill and rolls back the whole batch when an import fails. On success it records each skill's upstream source in `claude-user/skills-sources.json`. Review all imported instructions and scripts before installing or committing them.
+
+## Update a Skill
+
+Re-import an existing skill from its recorded source to pull the latest upstream version:
+
+```sh
+scripts/import-skill.sh --update find-skills
+scripts/import-skill.sh --update grill-me grilling
+```
+
+Update every skill listed in `claude-user/skills-sources.json`:
+
+```sh
+scripts/import-skill.sh --update --all
+```
+
+Update backs up the current version under `backups/skill-update-<timestamp>/` (gitignored), re-downloads the latest, validates, and prints a per-skill diff (`updated` or `unchanged`). Skills that share an upstream package are fetched once. If validation fails it restores the backup. Skills without a recorded source are not tracked in the manifest and are skipped by `--update --all`. Review the diff, then install with `scripts/install-skills.sh all` (or `claude` / `codex`).
 
 Included personal skills:
 
