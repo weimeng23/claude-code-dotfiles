@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/scripts/log.sh"
 source_dir="$repo_root/claude-user"
 
 validate_json() {
@@ -12,7 +13,7 @@ validate_json() {
   elif command -v python3 >/dev/null 2>&1; then
     python3 -m json.tool "$json_file" >/dev/null
   else
-    echo "error: JSON validation requires jq or python3" >&2
+    log_err "error: JSON validation requires jq or python3"
     return 1
   fi
 }
@@ -22,7 +23,7 @@ validate_skills() {
   local entry entry_name skill_file name nested_link
 
   if [[ -L "$skills_dir" ]]; then
-    echo "error: skills directory must not be a symbolic link: ${skills_dir#$repo_root/}" >&2
+    log_err "error: skills directory must not be a symbolic link: ${skills_dir#$repo_root/}"
     return 1
   fi
 
@@ -31,7 +32,7 @@ validate_skills() {
   fi
 
   if [[ ! -d "$skills_dir" ]]; then
-    echo "error: skills path is not a directory: ${skills_dir#$repo_root/}" >&2
+    log_err "error: skills path is not a directory: ${skills_dir#$repo_root/}"
     return 1
   fi
 
@@ -39,7 +40,7 @@ validate_skills() {
     entry_name="$(basename "$entry")"
 
     if [[ -L "$entry" ]]; then
-      echo "error: symbolic links are not allowed in ${entry#$repo_root/}" >&2
+      log_err "error: symbolic links are not allowed in ${entry#$repo_root/}"
       return 1
     fi
 
@@ -47,19 +48,19 @@ validate_skills() {
       if [[ "$entry_name" == ".gitkeep" ]]; then
         continue
       fi
-      echo "error: unexpected file in skills directory: ${entry#$repo_root/}" >&2
+      log_err "error: unexpected file in skills directory: ${entry#$repo_root/}"
       return 1
     fi
 
     if [[ "$entry_name" == .* ]]; then
-      echo "error: hidden skill directories are not allowed: ${entry#$repo_root/}" >&2
+      log_err "error: hidden skill directories are not allowed: ${entry#$repo_root/}"
       return 1
     fi
 
     skill_file="$entry/SKILL.md"
 
     if [[ -L "$skill_file" || ! -f "$skill_file" ]]; then
-      echo "error: missing regular SKILL.md in ${entry#$repo_root/}" >&2
+      log_err "error: missing regular SKILL.md in ${entry#$repo_root/}"
       return 1
     fi
 
@@ -72,7 +73,7 @@ validate_skills() {
       opened && line == "---" { closed = 1; exit }
       END { exit !(opened && closed) }
     ' "$skill_file"; then
-      echo "error: invalid frontmatter in ${skill_file#$repo_root/}" >&2
+      log_err "error: invalid frontmatter in ${skill_file#$repo_root/}"
       return 1
     fi
 
@@ -95,7 +96,7 @@ validate_skills() {
         print value
       }
     ' "$skill_file")"; then
-      echo "error: SKILL.md must contain exactly one top-level name in ${skill_file#$repo_root/}" >&2
+      log_err "error: SKILL.md must contain exactly one top-level name in ${skill_file#$repo_root/}"
       return 1
     fi
 
@@ -111,45 +112,45 @@ validate_skills() {
     esac
 
     if [[ ! "$name" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ || ${#name} -gt 64 ]]; then
-      echo "error: invalid skill name in ${skill_file#$repo_root/}: $name" >&2
+      log_err "error: invalid skill name in ${skill_file#$repo_root/}: $name"
       return 1
     fi
 
     if [[ "$name" != "$entry_name" ]]; then
-      echo "error: skill name '$name' does not match directory '$entry_name'" >&2
+      log_err "error: skill name '$name' does not match directory '$entry_name'"
       return 1
     fi
 
     nested_link="$(find "$entry" -type l -print -quit)"
     if [[ -n "$nested_link" ]]; then
-      echo "error: symbolic links are not allowed in Skill contents: ${nested_link#$repo_root/}" >&2
+      log_err "error: symbolic links are not allowed in Skill contents: ${nested_link#$repo_root/}"
       return 1
     fi
 
-    echo "skill ok: ${skill_file#$repo_root/}"
+    log_ok "skill ok: ${skill_file#$repo_root/}"
 
     if command -v npx >/dev/null 2>&1; then
       if NO_COLOR=1 npx --yes --offline skills add "$entry" --list </dev/null >/dev/null 2>&1; then
-        echo "skill metadata ok: ${skill_file#$repo_root/}"
+        log_ok "skill metadata ok: ${skill_file#$repo_root/}"
       else
-        echo "warning: skipped Skill metadata validation for ${skill_file#$repo_root/}; cached skills CLI unavailable or Skill rejected" >&2
+        log_warn "warning: skipped Skill metadata validation for ${skill_file#$repo_root/}; cached skills CLI unavailable or Skill rejected"
       fi
     else
-      echo "warning: npx unavailable; skipped Skill metadata validation for ${skill_file#$repo_root/}" >&2
+      log_warn "warning: npx unavailable; skipped Skill metadata validation for ${skill_file#$repo_root/}"
     fi
   done < <(find "$skills_dir" -mindepth 1 -maxdepth 1 -print0)
 }
 
 while IFS= read -r -d '' json_file; do
   validate_json "$json_file"
-  echo "json ok: ${json_file#$repo_root/}"
+  log_ok "json ok: ${json_file#$repo_root/}"
 done < <(find "$source_dir" -name '*.json' -type f -print0)
 
 while IFS= read -r -d '' shell_file; do
   bash -n "$shell_file"
-  echo "shell ok: ${shell_file#$repo_root/}"
+  log_ok "shell ok: ${shell_file#$repo_root/}"
 done < <(find "$source_dir" "$repo_root/scripts" -name '*.sh' -type f -print0)
 
 validate_skills
 
-echo "validation ok"
+log_ok "validation ok"

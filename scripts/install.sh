@@ -2,12 +2,13 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/scripts/log.sh"
 source_dir="$repo_root/claude-user"
 mode="${1:-full}"
 skills_target="${2:-}"
 
 usage() {
-  echo "usage: $0 [--skills-only claude|codex]" >&2
+  log_warn "usage: $0 [--skills-only claude|codex]"
 }
 
 if [[ "$mode" == "full" && $# -eq 0 ]]; then
@@ -44,7 +45,7 @@ backup_file() {
   if [[ -e "$target" || -L "$target" ]]; then
     mkdir -p "$(dirname "$backup")"
     cp -P "$target" "$backup"
-    echo "backup: $target -> $backup"
+    log_info "backup: $target -> $backup"
   fi
 }
 
@@ -57,7 +58,7 @@ check_target() {
   fi
 
   if [[ -d "$target" ]]; then
-    echo "error: install target is a directory: $target" >&2
+    log_err "error: install target is a directory: $target"
     return 1
   fi
 }
@@ -76,7 +77,7 @@ install_file() {
   check_target "$source" "$target"
 
   if [[ -f "$target" ]] && cmp -s "$source" "$target"; then
-    echo "unchanged: $target"
+    log_dim "unchanged: $target"
     return
   fi
 
@@ -86,7 +87,7 @@ install_file() {
     rm -f "$temp"
     return 1
   fi
-  echo "installed: $target"
+  log_ok "installed: $target"
 }
 
 check_tree_targets() {
@@ -116,7 +117,7 @@ install_tree() {
 "$repo_root/scripts/validate.sh"
 
 if [[ -e "$target_dir" && ! -d "$target_dir" ]]; then
-  echo "error: config target is not a directory: $target_dir" >&2
+  log_err "error: config target is not a directory: $target_dir"
   exit 1
 fi
 
@@ -124,7 +125,7 @@ if [[ "$mode" == "--skills-only" ]]; then
   check_tree_targets "$source_dir/skills" "$skills_dir"
   mkdir -p "$target_dir"
   install_tree "$source_dir/skills" "$skills_dir"
-  echo "done: installed personal skills to $skills_dir"
+  log_ok "done: installed personal skills to $skills_dir"
   exit 0
 fi
 
@@ -142,4 +143,4 @@ install_tree "$source_dir/agents" "$target_dir/agents"
 install_tree "$source_dir/skills" "$skills_dir"
 install_tree "$source_dir/hooks" "$target_dir/hooks"
 
-echo "done: installed personal Claude Code config to $target_dir"
+log_ok "done: installed personal Claude Code config to $target_dir"

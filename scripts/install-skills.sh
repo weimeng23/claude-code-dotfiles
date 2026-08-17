@@ -2,10 +2,11 @@
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$script_dir/log.sh"
 target="${1:-}"
 
 if [[ $# -ne 1 ]]; then
-  echo "usage: $0 claude|codex|all" >&2
+  log_warn "usage: $0 claude|codex|all"
   exit 2
 fi
 
@@ -18,7 +19,7 @@ case "$target" in
     "$script_dir/install.sh" --skills-only codex
     ;;
   *)
-    echo "usage: $0 claude|codex|all" >&2
+    log_warn "usage: $0 claude|codex|all"
     exit 2
     ;;
 esac
