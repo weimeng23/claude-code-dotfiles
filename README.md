@@ -96,6 +96,7 @@ Update backs up the current version under `backups/skill-update-<timestamp>/` (g
 Included personal skills:
 
 - `karpathy-guidelines`: concise coding discipline for simple, surgical, verified changes.
+- `humanizer`: rewrite AI-sounding prose naturally while preserving its meaning.
 
 ## Validate
 

@@ -11,6 +11,9 @@
   "handoff": {
     "package": "ykdojo/claude-code-tips"
   },
+  "humanizer": {
+    "package": "blader/humanizer"
+  },
   "karpathy-guidelines": {
     "package": "multica-ai/andrej-karpathy-skills"
   }
