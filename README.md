@@ -5,7 +5,7 @@ Personal Claude Code configuration managed as dotfiles.
 ## Layout
 
 - `claude-user/CLAUDE.md`: global personal instructions installed to `$CLAUDE_CONFIG_DIR/CLAUDE.md`
-- `claude-user/settings.json`: global Claude Code settings installed to `$CLAUDE_CONFIG_DIR/settings.json`
+- `claude-user/settings.json`: initial global Claude Code settings installed to `$CLAUDE_CONFIG_DIR/settings.json` when it does not exist
 - `claude-user/agents/`: personal subagents installed to `$CLAUDE_CONFIG_DIR/agents/`
 - `claude-user/skills/`: personal skills installed to `$CLAUDE_CONFIG_DIR/skills/`
 - `claude-user/hooks/`: personal hooks installed to `$CLAUDE_CONFIG_DIR/hooks/`
@@ -27,6 +27,16 @@ Install to `~/.claude/`, the default Claude Code config directory:
 
 ```sh
 scripts/install.sh
+```
+
+An existing `settings.json` is kept, because it may contain local settings such as plugins, `statusLine`, permissions, or environment variables. The installer prints a warning with a `diff` command when it differs from the repository.
+
+Installing hook scripts does not enable them automatically. New or changed hook registrations must also be applied to your local `settings.json`.
+
+To back it up and replace it with the repository version:
+
+```sh
+scripts/install.sh --overwrite-settings
 ```
 
 Install to a different Claude Code config directory:

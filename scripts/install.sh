@@ -6,12 +6,18 @@ source "$repo_root/scripts/log.sh"
 source_dir="$repo_root/claude-user"
 mode="${1:-full}"
 skills_target="${2:-}"
+overwrite_settings=false
 
 usage() {
-  log_warn "usage: $0 [--skills-only claude|codex]"
+  log_warn "usage: $0 [--overwrite-settings | --skills-only claude|codex]"
 }
 
-if [[ "$mode" == "full" && $# -eq 0 ]]; then
+if [[ "$mode" == "--overwrite-settings" && $# -eq 1 ]]; then
+  mode="full"
+  overwrite_settings=true
+fi
+
+if [[ "$mode" == "full" && ( $# -eq 0 || "$overwrite_settings" == true ) ]]; then
   target_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
   skills_dir="$target_dir/skills"
 elif [[ "$mode" == "--skills-only" && $# -eq 2 ]]; then
@@ -90,6 +96,22 @@ install_file() {
   log_ok "installed: $target"
 }
 
+# settings.json is also edited directly and by Claude Code, so only the first install writes it by default.
+install_settings() {
+  local source="$source_dir/settings.json"
+  local target="$target_dir/settings.json"
+
+  if [[ "$overwrite_settings" == true || ! ( -e "$target" || -L "$target" ) ]]; then
+    install_file "$source" "$target"
+  elif cmp -s "$source" "$target"; then
+    log_dim "unchanged: $target"
+  else
+    log_warn "skipped: $target already exists and differs from the repository"
+    log_warn "  review: diff \"$target\" \"$source\""
+    log_warn "  replace: $0 --overwrite-settings"
+  fi
+}
+
 check_tree_targets() {
   local source_tree="$1"
   local target_tree="$2"
@@ -138,7 +160,7 @@ check_tree_targets "$source_dir/hooks" "$target_dir/hooks"
 mkdir -p "$target_dir"
 
 install_file "$source_dir/CLAUDE.md" "$target_dir/CLAUDE.md"
-install_file "$source_dir/settings.json" "$target_dir/settings.json"
+install_settings
 install_tree "$source_dir/agents" "$target_dir/agents"
 install_tree "$source_dir/skills" "$skills_dir"
 install_tree "$source_dir/hooks" "$target_dir/hooks"
