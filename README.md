@@ -13,7 +13,7 @@ Personal Claude Code configuration managed as dotfiles.
 - `scripts/install.sh`: installs the personal config with backups
 - `scripts/install-skills.sh`: installs only personal skills for Claude Code or Codex
 - `scripts/import-skill.sh`: imports external skills into the repository for review, and updates them to their latest upstream version
-- `scripts/validate.sh`: validates JSON and shell scripts
+- `scripts/validate.sh`: validates JSON and shell scripts, and runs hook behavior tests
 
 ## Install
 
@@ -51,7 +51,7 @@ CODEX_SKILLS_DIR=~/.codex/skills scripts/install-skills.sh codex
 
 Existing files are backed up under the selected tool's config root at `backups/dotfiles-<timestamp>/` before being overwritten.
 
-The installer validates managed JSON and shell files before writing to the target directory.
+The installer validates managed JSON and shell files and runs hook behavior tests before writing to the target directory; a failed test blocks installation.
 JSON validation requires either `jq` or `python3`.
 Skill structure and names are always validated. Metadata is checked per Skill with the cached `skills` CLI in offline mode when available; a skipped metadata check warns but does not block installation.
 

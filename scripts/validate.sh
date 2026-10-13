@@ -153,4 +153,6 @@ done < <(find "$source_dir" "$repo_root/scripts" -name '*.sh' -type f -print0)
 
 validate_skills
 
+bash "$repo_root/scripts/test-block-dangerous-bash.sh"
+
 log_ok "validation ok"

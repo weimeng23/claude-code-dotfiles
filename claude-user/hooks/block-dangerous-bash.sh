@@ -28,15 +28,24 @@ if [[ -z "$cmd" ]]; then
 fi
 
 contains_dangerous_rm() {
-  local segment
+  # Best-effort guard against common accidental commands, not a security boundary.
+  # Shell-equivalent bypasses are out of scope.
+  local segment home_pattern protected_target_pattern
+
+  home_pattern="$(printf '%s' "$HOME" | sed 's/[][\\.^$*+?(){}|]/\\&/g')"
+  # Match root/home targets and wildcard forms, not specific subdirectories.
+  protected_target_pattern="(^|[[:space:]])[\"']?(/+|~|\\\$HOME|\\\$\\{HOME\\}|${home_pattern})[\"']?/*[\"']?\\.?\\**[\"']?($|[[:space:]])"
 
   while IFS= read -r segment; do
     if printf '%s' "$segment" | grep -Eiq '(^|[[:space:]])(--recursive|-[[:alpha:]]*r[[:alpha:]]*)($|[[:space:]])' &&
       printf '%s' "$segment" | grep -Eiq '(^|[[:space:]])(--force|-[[:alpha:]]*f[[:alpha:]]*)($|[[:space:]])' &&
-      printf '%s' "$segment" | grep -Eiq "(^|[[:space:]])[\"']?(/|~|\\\$HOME|\\\${HOME}|\\*)"; then
+      {
+        printf '%s' "$segment" | grep -Eq "$protected_target_pattern" ||
+          printf '%s' "$segment" | grep -Eq "(^|[[:space:]])[\"']?\\*"
+      }; then
       return 0
     fi
-  done < <(printf '%s' "$cmd" | grep -Eio '(^|[;&|()[:space:]])rm[[:space:]][^;&|()]*')
+  done < <(printf '%s' "$cmd" | grep -Eo '(^|[;&|()[:space:]])(/[^;&|()[:space:]]*/)?rm[[:space:]][^;&|()]*')
 
   return 1
 }
