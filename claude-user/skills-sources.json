@@ -2,6 +2,9 @@
   "find-skills": {
     "package": "vercel-labs/skills"
   },
+  "frontend-design": {
+    "package": "anthropics/skills"
+  },
   "grill-me": {
     "package": "mattpocock/skills"
   },

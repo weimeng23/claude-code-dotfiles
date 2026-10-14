@@ -105,6 +105,7 @@ Update backs up the current version under `backups/skill-update-<timestamp>/` (g
 
 Included personal skills:
 
+- `frontend-design`: intentional frontend visual design, typography, and layout from Anthropic.
 - `karpathy-guidelines`: concise coding discipline for simple, surgical, verified changes.
 - `humanizer`: rewrite AI-sounding prose naturally while preserving its meaning.
 
