@@ -67,6 +67,8 @@ Skill structure and names are always validated. Metadata is checked per Skill wi
 
 The hook commands in `settings.json` use `CLAUDE_CONFIG_DIR` when it is set and fall back to `~/.claude`.
 
+The file-protection hook permits `.env.example` edits outside protected directories, but blocks other env files. Read deny rules cover `.env` and the listed sensitive variants, not every `.env.*` name; unlisted names such as `.env.old` remain readable. Templates should contain placeholders only.
+
 The installer copies managed files but does not delete stale files that already exist in the target directory.
 
 ## Import a Skill

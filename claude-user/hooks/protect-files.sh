@@ -32,10 +32,16 @@ if [[ -z "$file" ]]; then
 fi
 
 case "$file" in
+  .env.example|*/.env.example)
+    ;;
   *.env|*.env.*|*/.env|*/.env.*)
     echo "Blocked edit/write to env file: $file" >&2
     exit 2
     ;;
+esac
+
+# Template exceptions only skip the env check, not the protections below.
+case "$file" in
   *id_rsa*|*id_ed25519*|*.pem|*.key|*.crt|*.token|*.secret)
     echo "Blocked edit/write to sensitive file: $file" >&2
     exit 2
