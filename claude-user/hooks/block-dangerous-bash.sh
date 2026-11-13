@@ -65,7 +65,9 @@ if printf '%s' "$cmd" | grep -Eiq 'chmod[[:space:]]+-R[[:space:]]+777|chown[[:sp
   exit 2
 fi
 
-if printf '%s' "$cmd" | grep -Eiq '(curl|wget).*\|[[:space:]]*(sh|bash|zsh)'; then
+# Best-effort match for download commands piped to a shell, not a shell parser.
+# Command boundaries avoid matching filenames and unrelated earlier commands.
+if printf '%s' "$cmd" | grep -Eq '(^|[;&|()])[[:space:]]*(/[^[:space:];&|()]*/)?(curl|wget)[[:space:]][^;&]*\|[[:space:]]*(/[^[:space:];&|()]*/)?(sh|bash|zsh)($|[[:space:];&|()])'; then
   echo "Blocked pipe-to-shell command: $cmd" >&2
   exit 2
 fi
